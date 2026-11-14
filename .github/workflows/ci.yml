@@ -75,7 +75,7 @@ jobs:
         run: npm test
       - name: Keep the generated lock file (commit it to switch to npm ci)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-package-lock
           path: frontend/package-lock.json
