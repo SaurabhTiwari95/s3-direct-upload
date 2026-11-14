@@ -1,0 +1,68 @@
+<main>
+  <h1>Direct upload to S3</h1>
+  <p class="lead">
+    The file goes straight from your browser to a private bucket. The API only signs the request
+    and checks the result.
+  </p>
+
+  <label for="api-key">API key</label>
+  <input
+    id="api-key"
+    type="password"
+    autocomplete="off"
+    spellcheck="false"
+    [value]="apiKey()"
+    (input)="onKeyInput($event)"
+    [disabled]="busy()"
+  />
+
+  <label for="file">File (PDF, PNG or JPEG, up to {{ formatBytes(maxBytes) }})</label>
+  <input id="file" type="file" [accept]="accept" (change)="onFileChange($event)" [disabled]="busy()" />
+
+  @if (file(); as chosen) {
+    <p class="muted">{{ chosen.name }} · {{ formatBytes(chosen.size) }}</p>
+  }
+
+  <button type="button" (click)="upload()" [disabled]="!canUpload()">Upload</button>
+
+  @switch (step()) {
+    @case ('requesting') {
+      <p role="status">Asking the API for an upload link…</p>
+    }
+    @case ('uploading') {
+      <p role="status">Uploading to storage: {{ progress() }}%</p>
+      <progress max="100" [value]="progress()" aria-label="Upload progress">{{ progress() }}%</progress>
+    }
+    @case ('verifying') {
+      <p role="status">Checking the stored file…</p>
+      <progress max="100" [value]="100" aria-label="Upload progress">100%</progress>
+    }
+  }
+
+  @if (error(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  }
+
+  @if (record(); as done) {
+    <section class="result" aria-live="polite">
+      <h2>Uploaded and verified</h2>
+      <dl>
+        <dt>File</dt>
+        <dd>{{ done.filename }}</dd>
+        <dt>Size</dt>
+        <dd>{{ formatBytes(done.size) }}</dd>
+        <dt>Type</dt>
+        <dd>{{ done.content_type }}</dd>
+        <dt>Upload id</dt>
+        <dd><code>{{ done.id }}</code></dd>
+      </dl>
+      @if (link(); as download) {
+        <p>
+          <a [href]="download.url" rel="noopener noreferrer">Download</a>
+          <span class="muted"> (link valid until {{ download.expires_at }})</span>
+        </p>
+      }
+      <button type="button" class="secondary" (click)="refreshLink()">Get a fresh link</button>
+    </section>
+  }
+</main>

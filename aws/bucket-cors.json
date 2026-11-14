@@ -1,0 +1,12 @@
+{
+  "CORSRules": [
+    {
+      "ID": "app-origin-only",
+      "AllowedOrigins": ["http://localhost:4200"],
+      "AllowedMethods": ["POST", "GET"],
+      "AllowedHeaders": ["Content-Type"],
+      "ExposeHeaders": ["ETag"],
+      "MaxAgeSeconds": 600
+    }
+  ]
+}

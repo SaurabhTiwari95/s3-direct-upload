@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local data (SQLite upload records)
+data/
+
+# Frontend
+node_modules/
+dist/
+.angular/
+coverage/
+
+# Secrets and local config: never commit
+.env
+*.pem
+*.key
+blocked-words.txt
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Policies with your bucket name filled in (docs/aws-setup.md)
+*.local.json

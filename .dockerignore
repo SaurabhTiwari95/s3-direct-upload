@@ -1,0 +1,13 @@
+.git
+.github
+.venv
+venv
+tests
+docs
+scripts
+frontend
+aws
+data
+**/__pycache__
+.env
+*.md

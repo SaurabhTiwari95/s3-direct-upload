@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks scans every commit
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Pre-publish check (private words, IPs, emails, phones, AWS ids) over API and Angular sources
+        env:
+          BLOCKED_WORDS: ${{ secrets.BLOCKED_WORDS }}
+        run: python scripts/prepublish_check.py
+      - name: Secret scan (gitleaks, full history)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Known vulnerabilities in Python dependencies
+        run: pip-audit -r requirements-dev.txt
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Lint
+        run: ruff check . && ruff format --check .
+      - name: Tests (unit, API with moto, end-to-end demo over HTTP), coverage gate 80%
+        run: pytest --cov-fail-under=80
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NG_CLI_ANALYTICS: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24" # Angular 22 needs Node ^22.22.3 or ^24.15
+      - name: Install (npm ci once package-lock.json is committed)
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-fund; fi
+      - name: Known vulnerabilities in npm dependencies
+        run: npm audit --audit-level=high
+      - name: Format check (Prettier)
+        run: npm run format:check
+      - name: Build (production)
+        run: npx ng build
+      - name: Unit tests (Vitest + jsdom, headless)
+        run: npm test
+      - name: Keep the generated lock file (commit it to switch to npm ci)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-package-lock
+          path: frontend/package-lock.json
+          if-no-files-found: ignore
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the API image
+        run: docker build -t s3-direct-upload:ci .
+      - name: Image runs as a non-root user
+        run: test "$(docker run --rm --entrypoint id s3-direct-upload:ci -u)" = "10001"
+      - name: Container starts and answers health and readiness checks
+        run: |
+          key="$(openssl rand -hex 24)" # throwaway key for this run only
+          docker run -d --name api -p 127.0.0.1:8000:8000 \
+            -e S3_BUCKET=ci-placeholder-bucket \
+            -e API_KEYS="{\"ci\": \"$key\"}" \
+            --cap-drop ALL --security-opt no-new-privileges \
+            s3-direct-upload:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8000/readyz
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/v1/uploads)" = "401"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Api-Key: $key" http://127.0.0.1:8000/v1/uploads)" = "200"
+      - name: Logs on failure
+        if: failure()
+        run: docker logs api
+      - name: Clean up
+        if: always()
+        run: docker rm -f api || true
+
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint Markdown
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          globs: "**/*.md"
+      - name: Check links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress --exclude-path .github "./**/*.md"
+          fail: true

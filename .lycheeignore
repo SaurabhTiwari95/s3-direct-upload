@@ -1,0 +1,10 @@
+# Own repos: checked by hand after each push (GitHub rate-limits link checkers, and later repos
+# don't exist yet when an earlier one is pushed).
+https://github.com/SaurabhTiwari95/.*
+# Local addresses used in the instructions
+http://localhost.*
+http://127\.0\.0\.1.*
+
+# Local app addresses in the README: only live while the app runs on your machine.
+http://127.0.0.1.*
+http://localhost.*
