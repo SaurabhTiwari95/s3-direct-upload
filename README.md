@@ -16,8 +16,8 @@ sequenceDiagram
     participant A as API (FastAPI)
     participant S as S3 bucket (private)
     B->>A: POST /v1/uploads {filename, content_type, size}
-    A->>A: check key, type, size, rate limit; pick key uploads/yyyy/mm/uuid.ext
-    A-->>B: pre-signed POST: url + fields (exact key, type, size; expires in 5 min)
+    A->>A: check key, type, size, rate limit, pick key uploads/yyyy/mm/uuid.ext
+    A-->>B: pre-signed POST: url + fields (exact key, type, size, expires in 5 min)
     B->>S: multipart form POST (fields, then the file), with progress
     S-->>B: 204 No Content
     B->>A: POST /v1/uploads/{id}/complete
